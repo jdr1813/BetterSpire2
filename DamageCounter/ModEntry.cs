@@ -54,6 +54,8 @@ public class ModEntry
         }
 
         PatchDrawingMethods(harmony, ref succeeded, ref failed);
+        KickPatches.Apply(harmony, ref succeeded, ref failed);
+        ScalingPatches.Apply(harmony, ref succeeded, ref failed);
 
         ModLog.Info($"Harmony patching complete: {succeeded} succeeded, {failed} failed");
         ModLog.Info("ModEntry.Init() complete");

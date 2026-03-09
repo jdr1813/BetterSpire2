@@ -1,6 +1,4 @@
 using HarmonyLib;
-using MegaCrit.Sts2.Core.Combat;
-using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Multiplayer;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Multiplayer.Game;
@@ -16,8 +14,61 @@ namespace BetterSpire2;
 public static class PartyManager
 {
     private static readonly HashSet<ulong> _mutedDrawings = new();
+    private static readonly HashSet<ulong> _kickedPlayers = new();
 
     public static bool IsDrawingMuted(ulong netId) => _mutedDrawings.Contains(netId);
+    public static bool IsKicked(ulong netId) => _kickedPlayers.Contains(netId);
+    public static bool HasKickedPlayers => _kickedPlayers.Count > 0;
+
+    /// <summary>
+    /// Un-kick a player (e.g. when they reconnect after being reinvited).
+    /// </summary>
+    public static void UnkickPlayer(ulong netId)
+    {
+        if (_kickedPlayers.Remove(netId))
+            ModLog.Info($"Un-kicked player {netId} (reconnected)");
+    }
+
+    /// <summary>
+    /// Track a player who disconnected naturally (not kicked by us).
+    /// They're treated the same as kicked for scaling and synchronizer purposes.
+    /// </summary>
+    public static void TrackDisconnectedPlayer(ulong netId)
+    {
+        if (_kickedPlayers.Add(netId))
+            ModLog.Info($"Tracking disconnected player {netId}");
+    }
+
+    /// <summary>
+    /// Check if a Player object is kicked by matching their NetId.
+    /// </summary>
+    public static bool IsPlayerKicked(Player player)
+    {
+        try { return _kickedPlayers.Contains(player.NetId); }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Get the index (slot) of kicked players in RunState.Players.
+    /// Used by synchronizers that track readiness by player index.
+    /// </summary>
+    public static List<int> GetKickedPlayerIndices()
+    {
+        var indices = new List<int>();
+        try
+        {
+            var runState = Traverse.Create(RunManager.Instance).Property<RunState>("State").Value;
+            var players = runState?.Players;
+            if (players == null) return indices;
+            for (int i = 0; i < players.Count; i++)
+            {
+                if (_kickedPlayers.Contains(players[i].NetId))
+                    indices.Add(i);
+            }
+        }
+        catch (Exception ex) { ModLog.Error("PartyManager.GetKickedPlayerIndices", ex); }
+        return indices;
+    }
 
     public static void ToggleDrawingMute(ulong netId)
     {
@@ -35,38 +86,22 @@ public static class PartyManager
             var netService = runManager.NetService;
             if (netService == null || netService.Type != NetGameType.Host) return;
 
-            // Disconnect at network level
+            // Track as kicked — patches will auto-resolve their actions
+            _kickedPlayers.Add(netId);
+            ModLog.Info($"Kicked player {netId}");
+
+            // Disconnect at network level — this automatically triggers
+            // RunLobby.OnDisconnectedFromClientAsHost → RemotePlayerDisconnected
             if (netService is INetHostGameService hostService)
                 hostService.DisconnectClient(netId, NetError.Kicked, true);
 
-            // Notify RunManager of the disconnect
-            var disconnectMethod = AccessTools.Method(typeof(RunManager), "RemotePlayerDisconnected");
-            disconnectMethod?.Invoke(runManager, new object[] { netId });
-
-            // Kill their creature and deactivate hooks so the game stops waiting for them
-            var runState = Traverse.Create(runManager).Property<RunState>("State").Value;
-            if (runState == null) return;
-
-            var player = runState.Players.FirstOrDefault(p => p.NetId == netId);
-            if (player == null) return;
-
-            player.DeactivateHooks();
-            ModLog.Info($"Deactivated hooks for kicked player {netId}");
-
-            // Kill their creature in combat if applicable
-            if (player.Creature != null && player.Creature.IsAlive)
-            {
-                var combatManager = CombatManager.Instance;
-                if (combatManager != null)
-                {
-                    var handleDeath = AccessTools.Method(typeof(CombatManager), "HandlePlayerDeath");
-                    handleDeath?.Invoke(combatManager, new object[] { player });
-                    ModLog.Info($"Killed creature for kicked player {netId}");
-                }
-            }
+            // Rescale current combat if we're in one
+            ScalingPatches.RescaleCurrentCombat();
         }
         catch (Exception ex) { ModLog.Error("PartyManager.KickPlayer", ex); }
     }
+
+    // ─── Drawing Management ───
 
     public static NMapDrawings? MapDrawings;
 
@@ -100,7 +135,17 @@ public static class PartyManager
     }
 
     public static void ClearMutes() => _mutedDrawings.Clear();
+    public static void ClearKicked()
+    {
+        if (_kickedPlayers.Count > 0)
+        {
+            ModLog.Info($"PartyManager: clearing {_kickedPlayers.Count} kicked player(s) for new run");
+            _kickedPlayers.Clear();
+        }
+    }
 }
+
+// ─── Block drawings from muted players ───
 
 public class MuteDrawingsPatch
 {

@@ -239,6 +239,15 @@ public static class SettingsMenu
             clearAllBtn.AddThemeColorOverride("font_color", new Color(1f, 0.6f, 0.2f));
             clearAllBtn.Pressed += () => PartyManager.ClearAllDrawings();
             vbox.AddChild(clearAllBtn);
+
+            if (isHost)
+            {
+                AddToggle(vbox, "Scale difficulty to active players", ModSettings.ScaleToActivePlayers, v => {
+                    ModSettings.ScaleToActivePlayers = v;
+                    ModSettings.Save();
+                    ScalingPatches.OnSettingToggled(v);
+                });
+            }
         }
         catch (Exception ex) { ModLog.Error("BuildPartySection", ex); }
     }

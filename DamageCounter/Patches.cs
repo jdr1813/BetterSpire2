@@ -64,6 +64,7 @@ public class RecalcPeriodicPatch
         if (now - _lastRecalcMs < 250) return;
         _lastRecalcMs = now;
         DamageTracker.Recalculate();
+        KickPatches.PeriodicCombatAutoReady();
     }
 }
 
@@ -143,5 +144,9 @@ public class SkipSplashPatch
     {
         if (ModSettings.SkipSplash)
             skipLogo = true;
+
+        // Clear kicked players when returning to menu (new run = clean slate)
+        PartyManager.ClearKicked();
+        PartyManager.ClearMutes();
     }
 }
