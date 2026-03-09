@@ -221,5 +221,6 @@ Things most likely to break on a game update:
 
 ## Known Issues
 
-- **Mac (ARM64 / Apple Silicon)** is currently unsupported. The game's Harmony modding framework does not function on macOS ARM64. This is a game engine issue — all Harmony-based mods are affected. The mod will work automatically once patched by the developers.
-- **Linux** has not been tested. If you encounter issues, include your `betterspire2_log.txt` file when reporting.
+- **Mac (ARM64 / Apple Silicon)** is currently unsupported. The game's Harmony/MonoMod runtime does not function on macOS ARM64 — `MonoMod.Core.dll` is missing from the Mac distribution and the native interop layer is absent. All Harmony patches fail with `NotImplementedException`. This is a game engine issue affecting all Harmony-based mods.
+- **Linux** is currently unsupported. MonoMod's native detour helper (`mm-exhelper.so`) fails to load at runtime with `undefined symbol: _Unwind_RaiseException`, likely due to a missing libgcc/libunwind linkage in the Steam Runtime environment. All Harmony patches fail with `DllNotFoundException`. This is a game engine issue affecting all Harmony-based mods.
+- Both platforms will work automatically once the developers patch the game's Harmony/MonoMod runtime.
