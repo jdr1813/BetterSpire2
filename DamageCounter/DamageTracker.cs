@@ -170,12 +170,6 @@ public static class DamageTracker
                         simBlock += plating.Amount;
                 }
 
-                // Buffer — negates the next N instances of HP loss
-                int bufferCharges = 0;
-                var buffer = player.GetPower<BufferPower>();
-                if (buffer != null && buffer.Amount > 0)
-                    bufferCharges = buffer.Amount;
-
                 // Intangible — reduces all damage instances to 1
                 bool intangible = player.GetPower<IntangiblePower>() != null;
 
@@ -209,11 +203,6 @@ public static class DamageTracker
                         int blocked = Math.Min(simBlock, damage);
                         simBlock -= blocked;
                         int hpLoss = damage - blocked;
-                        if (hpLoss > 0 && bufferCharges > 0)
-                        {
-                            bufferCharges--;
-                            hpLoss = 0;
-                        }
                         if (hpLoss > 0 && hasTungstenRod)
                             hpLoss = Math.Max(hpLoss - 1, 0);
                         playerTakes += hpLoss;
@@ -231,16 +220,9 @@ public static class DamageTracker
                     }
                     else
                     {
-                        if (damage > 0 && bufferCharges > 0)
-                        {
-                            bufferCharges--;
-                        }
-                        else
-                        {
-                            if (hasTungstenRod && damage > 0)
-                                damage = Math.Max(damage - 1, 0);
-                            playerTakes += damage;
-                        }
+                        if (hasTungstenRod && damage > 0)
+                            damage = Math.Max(damage - 1, 0);
+                        playerTakes += damage;
                     }
                 }
 
@@ -259,12 +241,6 @@ public static class DamageTracker
                         simPetHp -= absorbed;
                         petAbsorbed += absorbed;
                         remaining -= absorbed;
-                    }
-
-                    if (remaining > 0 && bufferCharges > 0)
-                    {
-                        bufferCharges--;
-                        remaining = 0;
                     }
 
                     if (remaining > 0 && hasTungstenRod)
