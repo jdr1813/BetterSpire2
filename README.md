@@ -1,6 +1,6 @@
 # BetterSpire2 - Slay the Spire 2 Mod
 
-A quality-of-life mod for Slay the Spire 2 that adds damage tracking, quick restart, and splash skip functionality.
+A quality-of-life mod for Slay the Spire 2 that adds damage tracking, a teammate hand viewer, quick restart, and more.
 
 ## Features
 
@@ -69,11 +69,20 @@ The simulation accounts for Defect's frost orbs, which grant passive block at en
 - **What it does:** Skips the logo/splash animation on game startup.
 - **How it works:** Patches `NGame.LaunchMainMenu` (Harmony Prefix), setting the `skipLogo` parameter to `true`.
 
+### 5. Teammate Hand Viewer
+- **What it does:** Press **F3** to open a compact panel showing every player's current hand in combat. Each card is rendered as a small thumbnail (100x80) with the card name. Hovering over any card shows a full tooltip with the card's description using the game's native `NHoverTipSet` system.
+- **How it works:** `DeckTracker` class reads each player's hand from `PlayerCombatState.Hand.Cards` via `CombatManager.DebugOnlyGetState()`. Cards are displayed in a grid layout grouped by player.
+  - **Pagination:** If there are more than 4 players, `<` `>` arrow buttons appear to page through them. Page Up / Page Down keyboard shortcuts also work.
+  - **Tooltips:** Each card is wrapped in a `CardPanel` (custom `PanelContainer` subclass) that wires up `MouseEntered`/`MouseExited` signals. On hover, it creates an `IHoverTip` via boxed struct reflection (since `HoverTip` is a `record struct` that takes `LocString`, not plain strings) and calls `NHoverTipSet.CreateAndShow()`. The tooltip node is reparented from the game's `HoverTipsContainer` into the mod's `CanvasLayer` so it renders above the panel.
+  - **Drag/close:** Mouse events are routed through `InputPatch` to `DeckTracker.HandleMouseInput()`. Supports click-and-drag to reposition, click-outside-to-close (with mutual awareness of SettingsMenu via `IsPointInPanel()`), and a close button.
+  - **Position memory:** Panel position is saved across open/close cycles.
+- **Key classes:** `DeckTracker`, `DeckTracker.CardPanel`, `DeckTracker.HandPanel`.
+
 ## Settings
 
 All features can be toggled on/off individually.
 
-- **In-game menu:** Press **F1** to open/close the settings panel (styled Godot UI overlay on `CanvasLayer` 100, z-index 200).
+- **In-game menu:** Press **F1** to open/close the settings panel (styled Godot UI overlay on `CanvasLayer` 10, z-index 200). The panel is draggable, supports click-outside-to-close, and has a close button. Position is remembered between opens.
 - **Persistence:** Settings are saved as a JSON file of `bool` values at `<user_data_dir>/betterspire2_settings.json`.
 - **Defaults:** All features are **enabled** by default.
 
@@ -84,7 +93,9 @@ All features can be toggled on/off individually.
   "PlayerDamageTotal": true,
   "ShowExpectedHp": true,
   "HoldRToRestart": true,
-  "SkipSplash": true
+  "SkipSplash": true,
+  "ScaleToActivePlayers": true,
+  "ShowTeammateHand": true
 }
 ```
 
@@ -95,16 +106,24 @@ DamageCounter/
   DamageCounter.sln              # Solution file
   DamageCounter/
     DamageCounter.csproj         # Project file (outputs BetterSpire2.dll)
-    Program.cs                   # ALL mod code lives in this single file
+    Program.cs                   # Entry point, core classes, multiplayer
+    Patches.cs                   # All Harmony patches
+    DamageTracker.cs             # Incoming damage simulation + labels
+    DeckTracker.cs               # F3 teammate hand viewer
+    RestartTracker.cs            # Hold-R restart logic
+    SettingsMenu.cs              # F1 settings panel
+    ModSettings.cs               # Settings persistence (JSON)
+    ModLog.cs                    # File logger
 ```
 
-### Program.cs layout (top to bottom)
+### Key source files
 
-| Section                        | Description                                      |
+| File / Class                   | Description                                      |
 |--------------------------------|--------------------------------------------------|
 | `ModLog`                       | File logger (writes to betterspire2_log.txt)     |
 | `ModSettings`                  | Static settings with JSON load/save              |
 | `SettingsMenu`                 | F1 toggle panel (Godot UI) + party section       |
+| `DeckTracker`                  | F3 hand viewer with card tooltips + pagination   |
 | `PartyManager`                 | Multiplayer: mute drawings, kick, clear drawings |
 | `MuteDrawingsPatch`            | Block drawings from muted players (manual patch) |
 | `MuteClearDrawingsPatch`       | Block clear from muted players (manual patch)    |
@@ -113,7 +132,7 @@ DamageCounter/
 | `DamageTracker`                | Player/pet damage simulation + label rendering   |
 | Recalc/Hide patches            | Triggers for DamageTracker updates and cleanup   |
 | `RestartTracker`               | Hold-R restart logic + async restart flow        |
-| `InputPatch`                   | F1 and hold-R input handling                     |
+| `InputPatch`                   | F1/F3 menu, PgUp/PgDn, hold-R input handling    |
 | `SkipSplashPatch`              | Splash screen skip                               |
 
 ## Build & Deployment
@@ -156,7 +175,7 @@ The game's mod loader calls `ModEntry.Init()` (via `[ModInitializer("Init")]`), 
 | `HideOnResetPatch`         | `CombatManager.Reset`              | Postfix | Hide damage labels                   |
 | `HideOnWinPatch`           | `CombatManager.EndCombatInternal`   | Prefix  | Hide damage labels on victory        |
 | `HideOnLosePatch`          | `CombatManager.LoseCombat`         | Prefix  | Hide damage labels on defeat         |
-| `InputPatch`               | `NGame._Input`                      | Postfix | F1 menu + hold-R restart             |
+| `InputPatch`               | `NGame._Input`                      | Postfix | F1/F3 menus, PgUp/PgDn, hold-R restart |
 | `SkipSplashPatch`          | `NGame.LaunchMainMenu`             | Prefix  | Set `skipLogo = true`                |
 | `MuteDrawingsPatch`*       | `NMapDrawings.HandleDrawingMessage` | Prefix  | Block drawings from muted players    |
 | `MuteClearDrawingsPatch`*  | `NMapDrawings.HandleClearMapDrawingsMessage` | Prefix | Block clear from muted players |
@@ -182,6 +201,9 @@ The game's mod loader calls `ModEntry.Init()` (via `[ModInitializer("Init")]`), 
 - **`PlayerCombatState.OrbQueue.Orbs`** - List of channeled orbs (for frost orb passive block calculation)
 - **`OrbModel.PassiveVal`** - The passive value of an orb (returns `decimal`, cast to `int`); for `FrostOrb` this is the block amount
 - **`Creature.MaxHp`** / `Monster.IsHealthBarVisible` - Used to filter out non-hittable pets (e.g. Pael's Legion)
+- **`NHoverTipSet.CreateAndShow()`** / `NHoverTipSet.Remove()` - Game's native tooltip system (used by DeckTracker for card tooltips)
+- **`HoverTip` record struct** - Tooltip data container; set via boxed reflection since constructors require `LocString`
+- **`CardModel.Title` / `CardModel.Description`** - Card name and description text (via `GetFormattedText()`)
 
 ## Multiplayer Support
 
