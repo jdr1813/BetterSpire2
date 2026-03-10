@@ -115,6 +115,19 @@ public class InputPatch
                 return;
             }
 
+            if (inputEvent is InputEventKey pgEvent && pgEvent.Pressed && !pgEvent.IsEcho())
+            {
+                if (pgEvent.Keycode == Key.Pagedown) { DeckTracker.NextPage(); return; }
+                if (pgEvent.Keycode == Key.Pageup) { DeckTracker.PrevPage(); return; }
+            }
+
+            // Mouse events for panel drag/close
+            if (inputEvent is InputEventMouseButton or InputEventMouseMotion)
+            {
+                SettingsMenu.HandleMouseInput(inputEvent);
+                DeckTracker.HandleMouseInput(inputEvent);
+            }
+
             if (!ModSettings.HoldRToRestart) return;
 
             if (inputEvent is InputEventKey keyEvent && keyEvent.Keycode == Key.R)
