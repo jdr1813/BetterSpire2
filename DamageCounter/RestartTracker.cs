@@ -35,7 +35,11 @@ public static class RestartTracker
             if (state == null) return;
 
             _character = state.Players[0].Character;
-            _acts = state.Acts.ToList();
+            // Save canonical (immutable) act references — NOT the mutable copies.
+            // Mutable acts carry populated _rooms with encounter queues and visit counters.
+            // Reusing them causes GenerateRooms() to APPEND to the old queue,
+            // so the first 3 "weak" encounters end up unreachable and you get hard fights.
+            _acts = state.Acts.Select(a => a.CanonicalInstance).ToList();
             _modifiers = state.Modifiers.ToList();
             _ascension = state.AscensionLevel;
             _restartPending = true;
@@ -66,7 +70,9 @@ public static class RestartTracker
             string newSeed = SeedHelper.GetRandomSeed();
             var player = Player.CreateForNewRun(_character, SaveManager.Instance.GenerateUnlockStateFromProgress(), 1UL);
             var players = new List<Player> { player };
-            var runState = RunState.CreateForNewRun(players, _acts, _modifiers, _ascension, newSeed);
+            // Create fresh mutable acts from canonical references so _rooms is empty
+            var freshActs = _acts.Select(a => a.ToMutable()).ToList();
+            var runState = RunState.CreateForNewRun(players, freshActs, _modifiers, _ascension, newSeed);
             RunManager.Instance.SetUpNewSinglePlayer(runState, true);
 
             var startRunMethod = AccessTools.Method(typeof(NGame), "StartRun");
