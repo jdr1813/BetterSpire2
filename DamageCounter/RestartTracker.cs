@@ -59,6 +59,10 @@ public static class RestartTracker
             await game.ReturnToMainMenu();
             await game.ToSignal(game.GetTree().CreateTimer(0.5), SceneTreeTimer.SignalName.Timeout);
 
+            // Stop main menu music before starting the new run
+            try { game.AudioManager?.StopMusic(); }
+            catch (Exception ex) { ModLog.Error("RestartRun StopMusic", ex); }
+
             string newSeed = SeedHelper.GetRandomSeed();
             var player = Player.CreateForNewRun(_character, SaveManager.Instance.GenerateUnlockStateFromProgress(), 1UL);
             var players = new List<Player> { player };
