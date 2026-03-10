@@ -3,6 +3,7 @@ using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Models.Orbs;
 using MegaCrit.Sts2.Core.Models.Powers;
+using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.MonsterMoves.Intents;
 using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Nodes.Combat;
@@ -44,12 +45,17 @@ public static class DamageTracker
                 return;
             }
 
-            var state = CombatManager.Instance.DebugOnlyGetState();
+            var combatManager = CombatManager.Instance;
+            var state = combatManager.DebugOnlyGetState();
             if (state == null)
             {
                 Hide();
                 return;
             }
+
+            // Lock display during enemy turn — block/HP changes mid-animation cause flickering
+            if (combatManager.IsEnemyTurnStarted)
+                return;
 
             var playerCreatures = state.PlayerCreatures;
 
@@ -145,6 +151,37 @@ public static class DamageTracker
                 int petAbsorbed = 0;
                 int playerTakes = 0;
 
+                // End-of-turn block sources — only add during player turn (before already applied)
+                if (!combatManager.IsEnemyTurnStarted)
+                {
+                    // Orichalcum — grants block at end of turn only if player has 0 block
+                    // Check before adding plating, since the game checks original block
+                    if (simBlock == 0 && player.Player?.Relics != null)
+                    {
+                        if (player.Player.Relics.OfType<Orichalcum>().Any())
+                            simBlock += 6;
+                        if (player.Player.Relics.OfType<FakeOrichalcum>().Any())
+                            simBlock += 3;
+                    }
+
+                    // Plating (Metallicize) — grants block at end of turn before enemies attack
+                    var plating = player.GetPower<PlatingPower>();
+                    if (plating != null && plating.Amount > 0)
+                        simBlock += plating.Amount;
+                }
+
+                // Buffer — negates the next N instances of HP loss
+                int bufferCharges = 0;
+                var buffer = player.GetPower<BufferPower>();
+                if (buffer != null && buffer.Amount > 0)
+                    bufferCharges = buffer.Amount;
+
+                // Intangible — reduces all damage instances to 1
+                bool intangible = player.GetPower<IntangiblePower>() != null;
+
+                // Tungsten Rod relic — reduces each HP loss by 1 (min 1)
+                bool hasTungstenRod = player.Player?.Relics?.OfType<TungstenRod>().Any() == true;
+
                 // Frost orb passive block
                 if (player.Player?.PlayerCombatState?.OrbQueue != null)
                 {
@@ -156,8 +193,9 @@ public static class DamageTracker
                 }
 
                 // Blockable end-of-turn damage
-                foreach (var (target, damage) in endOfTurnHits)
+                foreach (var (target, dmg) in endOfTurnHits)
                 {
+                    int damage = (intangible && !target.IsPet) ? Math.Min(dmg, 1) : dmg;
                     if (target.IsPet)
                     {
                         int blocked = Math.Min(simPetBlock, damage);
@@ -170,13 +208,22 @@ public static class DamageTracker
                     {
                         int blocked = Math.Min(simBlock, damage);
                         simBlock -= blocked;
-                        playerTakes += damage - blocked;
+                        int hpLoss = damage - blocked;
+                        if (hpLoss > 0 && bufferCharges > 0)
+                        {
+                            bufferCharges--;
+                            hpLoss = 0;
+                        }
+                        if (hpLoss > 0 && hasTungstenRod)
+                            hpLoss = Math.Max(hpLoss - 1, 0);
+                        playerTakes += hpLoss;
                     }
                 }
 
                 // Unblockable end-of-turn damage
-                foreach (var (target, damage) in endOfTurnUnblockableHits)
+                foreach (var (target, dmg) in endOfTurnUnblockableHits)
                 {
+                    int damage = (intangible && !target.IsPet) ? Math.Min(dmg, 1) : dmg;
                     if (target.IsPet)
                     {
                         simPetHp -= damage;
@@ -184,14 +231,23 @@ public static class DamageTracker
                     }
                     else
                     {
-                        playerTakes += damage;
+                        if (damage > 0 && bufferCharges > 0)
+                        {
+                            bufferCharges--;
+                        }
+                        else
+                        {
+                            if (hasTungstenRod && damage > 0)
+                                damage = Math.Max(damage - 1, 0);
+                            playerTakes += damage;
+                        }
                     }
                 }
 
                 // Enemy attack damage: block -> pet HP -> player HP
                 foreach (int hit in enemyHits)
                 {
-                    int remaining = hit;
+                    int remaining = intangible ? Math.Min(hit, 1) : hit;
 
                     int blocked = Math.Min(simBlock, remaining);
                     simBlock -= blocked;
@@ -204,6 +260,15 @@ public static class DamageTracker
                         petAbsorbed += absorbed;
                         remaining -= absorbed;
                     }
+
+                    if (remaining > 0 && bufferCharges > 0)
+                    {
+                        bufferCharges--;
+                        remaining = 0;
+                    }
+
+                    if (remaining > 0 && hasTungstenRod)
+                        remaining = Math.Max(remaining - 1, 0);
 
                     playerTakes += remaining;
                 }
