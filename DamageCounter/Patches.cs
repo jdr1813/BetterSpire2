@@ -106,6 +106,15 @@ public class InputPatch
                 return;
             }
 
+            if (inputEvent is InputEventKey f3Event
+                && f3Event.Keycode == Key.F3
+                && f3Event.Pressed
+                && !f3Event.IsEcho())
+            {
+                DeckTracker.Toggle();
+                return;
+            }
+
             if (!ModSettings.HoldRToRestart) return;
 
             if (inputEvent is InputEventKey keyEvent && keyEvent.Keycode == Key.R)

@@ -15,6 +15,7 @@ public static class ModSettings
     public static bool HoldRToRestart = true;
     public static bool SkipSplash = true;
     public static bool ScaleToActivePlayers = true;
+    public static bool ShowTeammateHand = true;
 
     public static void Load()
     {
@@ -30,6 +31,7 @@ public static class ModSettings
             if (dict.TryGetValue("HoldRToRestart", out val)) HoldRToRestart = val;
             if (dict.TryGetValue("SkipSplash", out val)) SkipSplash = val;
             if (dict.TryGetValue("ScaleToActivePlayers", out val)) ScaleToActivePlayers = val;
+            if (dict.TryGetValue("ShowTeammateHand", out val)) ShowTeammateHand = val;
         }
         catch (Exception ex) { ModLog.Error("ModSettings.Load", ex); }
     }
@@ -45,7 +47,8 @@ public static class ModSettings
                 ["ShowExpectedHp"] = ShowExpectedHp,
                 ["HoldRToRestart"] = HoldRToRestart,
                 ["SkipSplash"] = SkipSplash,
-                ["ScaleToActivePlayers"] = ScaleToActivePlayers
+                ["ScaleToActivePlayers"] = ScaleToActivePlayers,
+                ["ShowTeammateHand"] = ShowTeammateHand
             };
             var json = System.Text.Json.JsonSerializer.Serialize(dict);
             System.IO.File.WriteAllText(SettingsPath, json);

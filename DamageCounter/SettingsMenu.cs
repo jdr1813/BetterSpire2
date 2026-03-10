@@ -83,6 +83,10 @@ public static class SettingsMenu
             ModSettings.SkipSplash = v;
             ModSettings.Save();
         });
+        AddToggle(vbox, "Show Teammate Hand in Combat", ModSettings.ShowTeammateHand, v => {
+            ModSettings.ShowTeammateHand = v;
+            ModSettings.Save();
+        });
 
         BuildPartySection(vbox);
 
