@@ -2,12 +2,20 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Modding;
 using MegaCrit.Sts2.Core.Nodes.Screens.Map;
 using System;
+using System.Runtime.InteropServices;
 
 namespace BetterSpire2;
 
 [ModInitializer("Init")]
 public class ModEntry
 {
+    [DllImport("libdl.so.2")]
+    private static extern IntPtr dlopen(string filename, int flags);
+
+    [DllImport("libdl.so.2")]
+    private static extern IntPtr dlerror();
+
+    private static IntPtr _libgccHandle;
     private static bool _initialized;
 
     private static readonly Type[] _patchClasses =
@@ -30,6 +38,17 @@ public class ModEntry
 
         ModLog.Init();
         ModLog.Info("ModEntry.Init() starting");
+
+        // Linux: pre-load libgcc_s so Harmony's mm-exhelper.so can resolve _Unwind_RaiseException
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            ModLog.Info("Linux detected — loading libgcc_s for Harmony compatibility");
+            _libgccHandle = dlopen("libgcc_s.so.1", 2 | 256); // RTLD_NOW | RTLD_GLOBAL
+            if (_libgccHandle == IntPtr.Zero)
+                ModLog.Info($"  dlopen failed: {Marshal.PtrToStringAnsi(dlerror())}");
+            else
+                ModLog.Info("  libgcc_s loaded successfully");
+        }
 
         ModSettings.Load();
         ModLog.Info("Settings loaded");
