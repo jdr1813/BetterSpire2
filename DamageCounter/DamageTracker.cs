@@ -64,6 +64,11 @@ public static class DamageTracker
             {
                 if (enemy.IsDead || enemy.Monster == null) continue;
 
+                // Poison ticks before enemies attack — skip enemies that will die from poison
+                var poison = enemy.GetPower<PoisonPower>();
+                if (poison != null && poison.Amount >= enemy.CurrentHp)
+                    continue;
+
                 foreach (var intent in enemy.Monster.NextMove.Intents)
                 {
                     if (intent is AttackIntent attackIntent)
@@ -249,17 +254,26 @@ public static class DamageTracker
                     playerTakes += remaining;
                 }
 
+                // Regen heals at AfterTurnEnd (before enemy attacks) — factor into expected HP
+                int regenHeal = 0;
+                var regen = player.GetPower<RegenPower>();
+                if (regen != null && regen.Amount > 0)
+                    regenHeal = regen.Amount;
+
                 activeCreatures.Add(player);
                 if (playerTakes > 0)
                 {
                     string text = ModSettings.ShowExpectedHp
-                        ? $"{playerTakes} ({player.CurrentHp - playerTakes})"
+                        ? $"{playerTakes} ({Math.Min(player.CurrentHp - playerTakes + regenHeal, player.MaxHp)})"
                         : playerTakes.ToString();
                     ShowLabel(player, text, new Color(1f, 0.3f, 0.3f));
                 }
                 else
                 {
-                    ShowLabel(player, "0", new Color(0.3f, 1f, 0.3f));
+                    if (ModSettings.ShowExpectedHp && regenHeal > 0)
+                        ShowLabel(player, $"0 ({Math.Min(player.CurrentHp + regenHeal, player.MaxHp)})", new Color(0.3f, 1f, 0.3f));
+                    else
+                        ShowLabel(player, "0", new Color(0.3f, 1f, 0.3f));
                 }
 
                 if (petAbsorbs && petAbsorbed > 0)
