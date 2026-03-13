@@ -1,16 +1,16 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DamageCounter", "DamageCounter\DamageCounter.csproj", "{09A21CE4-6E72-49C3-9AAB-EC83682F2D33}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug|Any CPU = Debug|Any CPU
-		Release|Any CPU = Release|Any CPU
+		Full|Any CPU = Full|Any CPU
+		Lite|Any CPU = Lite|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{09A21CE4-6E72-49C3-9AAB-EC83682F2D33}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{09A21CE4-6E72-49C3-9AAB-EC83682F2D33}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{09A21CE4-6E72-49C3-9AAB-EC83682F2D33}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{09A21CE4-6E72-49C3-9AAB-EC83682F2D33}.Release|Any CPU.Build.0 = Release|Any CPU
+		{09A21CE4-6E72-49C3-9AAB-EC83682F2D33}.Full|Any CPU.ActiveCfg = Full|Any CPU
+		{09A21CE4-6E72-49C3-9AAB-EC83682F2D33}.Full|Any CPU.Build.0 = Full|Any CPU
+		{09A21CE4-6E72-49C3-9AAB-EC83682F2D33}.Lite|Any CPU.ActiveCfg = Lite|Any CPU
+		{09A21CE4-6E72-49C3-9AAB-EC83682F2D33}.Lite|Any CPU.Build.0 = Lite|Any CPU
 	EndGlobalSection
 EndGlobal

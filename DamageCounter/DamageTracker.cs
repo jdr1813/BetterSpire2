@@ -59,7 +59,8 @@ public static class DamageTracker
 
             var playerCreatures = state.PlayerCreatures;
 
-            var enemyHits = new List<int>();
+            // Tag each hit with the enemy it came from for per-enemy breakdown
+            var enemyHits = new List<(Creature enemy, int damage)>();
             foreach (var enemy in state.Enemies)
             {
                 if (enemy.IsDead || enemy.Monster == null) continue;
@@ -79,7 +80,7 @@ public static class DamageTracker
                             (IEnumerable<Creature>)playerCreatures, enemy);
                         int numHits = singleHit > 0 ? totalDmg / singleHit : 0;
                         for (int i = 0; i < numHits; i++)
-                            enemyHits.Add(singleHit);
+                            enemyHits.Add((enemy, singleHit));
                     }
                 }
             }
@@ -143,7 +144,7 @@ public static class DamageTracker
 
                 int totalDamage = endOfTurnHits.Sum(d => d.damage)
                     + endOfTurnUnblockableHits.Sum(d => d.damage)
-                    + enemyHits.Sum();
+                    + enemyHits.Sum(h => h.damage);
 
                 if (totalDamage <= 0)
                     continue;
@@ -155,6 +156,10 @@ public static class DamageTracker
                 int simPetBlock = petAbsorbs ? pet!.Block : 0;
                 int petAbsorbed = 0;
                 int playerTakes = 0;
+
+                // Buffer — negates one instance of HP loss per stack
+                var buffer = player.GetPower<BufferPower>();
+                int bufferStacks = buffer != null ? buffer.Amount : 0;
 
                 // End-of-turn block sources — only add during player turn (before already applied)
                 if (!combatManager.IsEnemyTurnStarted)
@@ -181,13 +186,20 @@ public static class DamageTracker
                 // Tungsten Rod relic — reduces each HP loss by 1 (min 1)
                 bool hasTungstenRod = player.Player?.Relics?.OfType<TungstenRod>().Any() == true;
 
-                // Frost orb passive block
+                // Frost orb passive block (PassiveVal already includes Focus)
                 if (player.Player?.PlayerCombatState?.OrbQueue != null)
                 {
-                    foreach (var orb in player.Player.PlayerCombatState.OrbQueue.Orbs)
+                    var orbs = player.Player!.PlayerCombatState!.OrbQueue.Orbs;
+                    // GoldPlatedCables: rightmost orb triggers passive an extra time
+                    bool hasGoldPlatedCables = player.Player.Relics?.OfType<GoldPlatedCables>().Any() == true;
+
+                    for (int i = 0; i < orbs.Count; i++)
                     {
-                        if (orb is FrostOrb frostOrb)
-                            simBlock += (int)frostOrb.PassiveVal;
+                        if (orbs[i] is FrostOrb frostOrb)
+                        {
+                            int triggerCount = (hasGoldPlatedCables && i == orbs.Count - 1) ? 2 : 1;
+                            simBlock += Math.Max((int)frostOrb.PassiveVal, 0) * triggerCount;
+                        }
                     }
                 }
 
@@ -210,6 +222,11 @@ public static class DamageTracker
                         int hpLoss = damage - blocked;
                         if (hpLoss > 0 && hasTungstenRod)
                             hpLoss = Math.Max(hpLoss - 1, 0);
+                        if (hpLoss > 0 && bufferStacks > 0)
+                        {
+                            bufferStacks--;
+                            hpLoss = 0;
+                        }
                         playerTakes += hpLoss;
                     }
                 }
@@ -227,12 +244,17 @@ public static class DamageTracker
                     {
                         if (hasTungstenRod && damage > 0)
                             damage = Math.Max(damage - 1, 0);
+                        if (damage > 0 && bufferStacks > 0)
+                        {
+                            bufferStacks--;
+                            damage = 0;
+                        }
                         playerTakes += damage;
                     }
                 }
 
                 // Enemy attack damage: block -> pet HP -> player HP
-                foreach (int hit in enemyHits)
+                foreach (var (enemy, hit) in enemyHits)
                 {
                     int remaining = intangible ? Math.Min(hit, 1) : hit;
 
@@ -250,6 +272,12 @@ public static class DamageTracker
 
                     if (remaining > 0 && hasTungstenRod)
                         remaining = Math.Max(remaining - 1, 0);
+
+                    if (remaining > 0 && bufferStacks > 0)
+                    {
+                        bufferStacks--;
+                        remaining = 0;
+                    }
 
                     playerTakes += remaining;
                 }
@@ -281,6 +309,8 @@ public static class DamageTracker
                     activeCreatures.Add(pet!);
                     ShowLabel(pet!, petAbsorbed.ToString(), new Color(1f, 0.6f, 0.2f));
                 }
+
+
             }
 
             var stale = _labels.Keys.Where(c => !activeCreatures.Contains(c)).ToList();

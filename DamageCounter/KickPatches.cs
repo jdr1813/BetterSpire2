@@ -1,3 +1,4 @@
+#if FULL_BUILD
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Multiplayer;
@@ -588,3 +589,4 @@ public static class KickPatches
     }
 
 }
+#endif

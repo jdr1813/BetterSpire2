@@ -53,7 +53,11 @@ public class ModEntry
         ModSettings.Load();
         ModLog.Info("Settings loaded");
 
+#if LITE_BUILD
+        var harmony = new Harmony("com.jdr.betterspire2lite");
+#else
         var harmony = new Harmony("com.jdr.betterspire2");
+#endif
         int succeeded = 0;
         int failed = 0;
 
@@ -73,8 +77,11 @@ public class ModEntry
         }
 
         PatchDrawingMethods(harmony, ref succeeded, ref failed);
+#if FULL_BUILD
         KickPatches.Apply(harmony, ref succeeded, ref failed);
         ScalingPatches.Apply(harmony, ref succeeded, ref failed);
+        AutoConfirmPatches.Apply(harmony, ref succeeded, ref failed);
+#endif
 
         ModLog.Info($"Harmony patching complete: {succeeded} succeeded, {failed} failed");
         ModLog.Info("ModEntry.Init() complete");

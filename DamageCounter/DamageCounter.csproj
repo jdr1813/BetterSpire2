@@ -2,14 +2,24 @@
 
     <PropertyGroup>
         <OutputType>Library</OutputType>
-        <AssemblyName>BetterSpire2</AssemblyName>
         <RootNamespace>BetterSpire2</RootNamespace>
         <TargetFramework>net9.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <Configurations>Full;Lite</Configurations>
 
         <!-- Set this to your Slay the Spire 2 install directory -->
         <Sts2Dir>G:\STEAM\Install\steamapps\common\Slay the Spire 2</Sts2Dir>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)' == 'Full'">
+        <AssemblyName>BetterSpire2</AssemblyName>
+        <DefineConstants>FULL_BUILD</DefineConstants>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)' == 'Lite'">
+        <AssemblyName>BetterSpire2Lite</AssemblyName>
+        <DefineConstants>LITE_BUILD</DefineConstants>
     </PropertyGroup>
 
     <ItemGroup>
@@ -24,9 +34,20 @@
         <PackageReference Include="MonoMod.Core" Version="1.2.3" />
     </ItemGroup>
 
+    <ItemGroup>
+        <None Include="BetterSpire2.json" CopyToOutputDirectory="PreserveNewest" />
+        <None Include="BetterSpire2Lite.json" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
     <!-- Auto-deploy to mods folder on build -->
     <Target Name="CopyToMods" AfterTargets="Build" Condition="Exists('$(Sts2Dir)\mods')">
         <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(Sts2Dir)\mods\" />
+        <Copy Condition="'$(Configuration)' == 'Full'"
+              SourceFiles="$(ProjectDir)BetterSpire2.json"
+              DestinationFolder="$(Sts2Dir)\mods\" />
+        <Copy Condition="'$(Configuration)' == 'Lite'"
+              SourceFiles="$(ProjectDir)BetterSpire2Lite.json"
+              DestinationFolder="$(Sts2Dir)\mods\" />
     </Target>
 
 </Project>
