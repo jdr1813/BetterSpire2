@@ -6,6 +6,8 @@ using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.Rooms;
 using MegaCrit.Sts2.Core.Runs;
+using MegaCrit.Sts2.Core.Saves;
+using MegaCrit.Sts2.Core.Settings;
 using System;
 
 namespace BetterSpire2;
@@ -96,7 +98,11 @@ public static class SettingsMenu
         vbox.AddChild(titleBar);
 
         var title = new Label();
+#if LITE_BUILD
+        title.Text = "BetterSpire2 Lite Settings";
+#else
         title.Text = "BetterSpire2 Settings";
+#endif
         title.HorizontalAlignment = HorizontalAlignment.Center;
         title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         title.MouseFilter = Control.MouseFilterEnum.Ignore;
@@ -145,10 +151,12 @@ public static class SettingsMenu
             ModSettings.Save();
             DamageTracker.Recalculate();
         });
+#if FULL_BUILD
         AddToggle(vbox, "Hold R to Restart Run", ModSettings.HoldRToRestart, v => {
             ModSettings.HoldRToRestart = v;
             ModSettings.Save();
         });
+#endif
         AddToggle(vbox, "Skip Splash Screen", ModSettings.SkipSplash, v => {
             ModSettings.SkipSplash = v;
             ModSettings.Save();
@@ -156,6 +164,33 @@ public static class SettingsMenu
         AddToggle(vbox, "Show Teammate Hand in Combat", ModSettings.ShowTeammateHand, v => {
             ModSettings.ShowTeammateHand = v;
             ModSettings.Save();
+        });
+
+#if FULL_BUILD
+        AddToggle(vbox, "Auto-Confirm Discard/Retain Selection", ModSettings.AutoConfirmSingleCard, v => {
+            ModSettings.AutoConfirmSingleCard = v;
+            ModSettings.Save();
+        });
+#endif
+
+        // Instant Fast Mode — uses the game's hidden FastModeType.Instant
+        bool isInstant = false;
+        try
+        {
+            isInstant = SaveManager.Instance?.PrefsSave?.FastMode == FastModeType.Instant;
+        }
+        catch { }
+        AddToggle(vbox, "Instant Fast Mode (fastest animations)", isInstant, v => {
+            try
+            {
+                var prefs = SaveManager.Instance?.PrefsSave;
+                if (prefs != null)
+                {
+                    prefs.FastMode = v ? FastModeType.Instant : FastModeType.Fast;
+                    ModLog.Info($"FastMode set to: {prefs.FastMode}");
+                }
+            }
+            catch (Exception ex) { ModLog.Error("FastMode toggle", ex); }
         });
 
         BuildPartySection(vbox);
@@ -183,7 +218,7 @@ public static class SettingsMenu
 
         _visible = true;
     }
-
+    
     private static void AddToggle(VBoxContainer parent, string label, bool initialValue, Action<bool> onToggle)
     {
         var check = new CheckButton();
@@ -298,6 +333,7 @@ public static class SettingsMenu
                     };
                     row.AddChild(muteBtn);
 
+#if FULL_BUILD
                     if (isHost)
                     {
                         var kickBtn = new Button();
@@ -312,6 +348,7 @@ public static class SettingsMenu
                         };
                         row.AddChild(kickBtn);
                     }
+#endif
                 }
 
                 vbox.AddChild(row);
@@ -324,6 +361,7 @@ public static class SettingsMenu
             clearAllBtn.Pressed += () => PartyManager.ClearAllDrawings();
             vbox.AddChild(clearAllBtn);
 
+#if FULL_BUILD
             if (isHost)
             {
                 AddToggle(vbox, "Scale difficulty to active players", ModSettings.ScaleToActivePlayers, v => {
@@ -332,6 +370,7 @@ public static class SettingsMenu
                     ScalingPatches.OnSettingToggled(v);
                 });
             }
+#endif
         }
         catch (Exception ex) { ModLog.Error("BuildPartySection", ex); }
     }

@@ -1,3 +1,4 @@
+#if FULL_BUILD
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Creatures;
@@ -340,3 +341,4 @@ public static class ScalingPatches
         TryPatch(harmony, ref succeeded, ref failed, $"{typeName}.{methodName}", method, prefix, postfix);
     }
 }
+#endif

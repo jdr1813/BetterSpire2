@@ -64,7 +64,9 @@ public class RecalcPeriodicPatch
         if (now - _lastRecalcMs < 250) return;
         _lastRecalcMs = now;
         DamageTracker.Recalculate();
+#if FULL_BUILD
         KickPatches.PeriodicCombatAutoReady();
+#endif
     }
 }
 
@@ -89,9 +91,11 @@ public class HideOnLosePatch
 [HarmonyPatch(typeof(NGame), "_Input")]
 public class InputPatch
 {
+#if FULL_BUILD
     private static ulong _pressStartTime;
     private static bool _isPressed;
     private static bool _triggered;
+#endif
 
     static void Postfix(InputEvent inputEvent)
     {
@@ -128,6 +132,7 @@ public class InputPatch
                 DeckTracker.HandleMouseInput(inputEvent);
             }
 
+#if FULL_BUILD
             if (!ModSettings.HoldRToRestart) return;
 
             if (inputEvent is InputEventKey keyEvent && keyEvent.Keycode == Key.R)
@@ -154,6 +159,7 @@ public class InputPatch
                     RestartTracker.RestartRun();
                 }
             }
+#endif
         }
         catch (Exception ex) { ModLog.Error("InputPatch", ex); }
     }
@@ -167,8 +173,10 @@ public class SkipSplashPatch
         if (ModSettings.SkipSplash)
             skipLogo = true;
 
-        // Clear kicked players when returning to menu (new run = clean slate)
+        // Clear state when returning to menu (new run = clean slate)
+#if FULL_BUILD
         PartyManager.ClearKicked();
+#endif
         PartyManager.ClearMutes();
     }
 }

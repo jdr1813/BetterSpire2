@@ -14,44 +14,34 @@ namespace BetterSpire2;
 public static class PartyManager
 {
     private static readonly HashSet<ulong> _mutedDrawings = new();
+#if FULL_BUILD
     private static readonly HashSet<ulong> _kickedPlayers = new();
+#endif
 
     public static bool IsDrawingMuted(ulong netId) => _mutedDrawings.Contains(netId);
+
+#if FULL_BUILD
     public static bool IsKicked(ulong netId) => _kickedPlayers.Contains(netId);
     public static bool HasKickedPlayers => _kickedPlayers.Count > 0;
 
-    /// <summary>
-    /// Un-kick a player (e.g. when they reconnect after being reinvited).
-    /// </summary>
     public static void UnkickPlayer(ulong netId)
     {
         if (_kickedPlayers.Remove(netId))
             ModLog.Info($"Un-kicked player {netId} (reconnected)");
     }
 
-    /// <summary>
-    /// Track a player who disconnected naturally (not kicked by us).
-    /// They're treated the same as kicked for scaling and synchronizer purposes.
-    /// </summary>
     public static void TrackDisconnectedPlayer(ulong netId)
     {
         if (_kickedPlayers.Add(netId))
             ModLog.Info($"Tracking disconnected player {netId}");
     }
 
-    /// <summary>
-    /// Check if a Player object is kicked by matching their NetId.
-    /// </summary>
     public static bool IsPlayerKicked(Player player)
     {
         try { return _kickedPlayers.Contains(player.NetId); }
         catch { return false; }
     }
 
-    /// <summary>
-    /// Get the index (slot) of kicked players in RunState.Players.
-    /// Used by synchronizers that track readiness by player index.
-    /// </summary>
     public static List<int> GetKickedPlayerIndices()
     {
         var indices = new List<int>();
@@ -69,6 +59,7 @@ public static class PartyManager
         catch (Exception ex) { ModLog.Error("PartyManager.GetKickedPlayerIndices", ex); }
         return indices;
     }
+#endif
 
     public static void ToggleDrawingMute(ulong netId)
     {
@@ -76,6 +67,7 @@ public static class PartyManager
             _mutedDrawings.Add(netId);
     }
 
+#if FULL_BUILD
     public static void KickPlayer(ulong netId)
     {
         try
@@ -86,20 +78,17 @@ public static class PartyManager
             var netService = runManager.NetService;
             if (netService == null || netService.Type != NetGameType.Host) return;
 
-            // Track as kicked — patches will auto-resolve their actions
             _kickedPlayers.Add(netId);
             ModLog.Info($"Kicked player {netId}");
 
-            // Disconnect at network level — this automatically triggers
-            // RunLobby.OnDisconnectedFromClientAsHost → RemotePlayerDisconnected
             if (netService is INetHostGameService hostService)
                 hostService.DisconnectClient(netId, NetError.Kicked, true);
 
-            // Rescale current combat if we're in one
             ScalingPatches.RescaleCurrentCombat();
         }
         catch (Exception ex) { ModLog.Error("PartyManager.KickPlayer", ex); }
     }
+#endif
 
     // ─── Drawing Management ───
 
@@ -135,6 +124,7 @@ public static class PartyManager
     }
 
     public static void ClearMutes() => _mutedDrawings.Clear();
+#if FULL_BUILD
     public static void ClearKicked()
     {
         if (_kickedPlayers.Count > 0)
@@ -143,6 +133,7 @@ public static class PartyManager
             _kickedPlayers.Clear();
         }
     }
+#endif
 }
 
 // ─── Block drawings from muted players ───

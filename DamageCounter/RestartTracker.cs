@@ -1,3 +1,4 @@
+#if FULL_BUILD
 using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Entities.Players;
@@ -89,3 +90,4 @@ public static class RestartTracker
         }
     }
 }
+#endif
